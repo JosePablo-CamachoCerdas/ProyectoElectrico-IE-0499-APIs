@@ -73,7 +73,7 @@ const testController = {
             // check if questionnarie exists
             const checkQuestionnaire = await Questionnaires.findOne({_id: questionnaireId})
             if(!checkQuestionnaire) {
-                return res.status(400).json({message: 'Questionnaire does not exists'})
+                return res.status(400).json({message: 'Questionnaire does not exist'})
             }
 
             // check if user already has the questionnaire assigned
@@ -180,6 +180,7 @@ const testController = {
 
                             // create and send an object as response
                             const questionResponse = {
+                                answerId: newAnswer._id,
                                 statement: obj,
                                 options: checkOptions
                             }
@@ -195,8 +196,10 @@ const testController = {
                 // if user has at least one postponed question, an array of questions ids is saved
                 if(checkUserPostponeAnswers.length > 0) {
                     const questionUserIdPostponedRelation = []
+                    const answerUserQuestionRelationId = []
                     checkUserPostponeAnswers.forEach( (obj) => { 
                         questionUserIdPostponedRelation.push(obj.questionId)
+                        answerUserQuestionRelationId.push(obj._id)
                     })
                     console.log("Postponed answers")
                     console.log(checkUserPostponeAnswers)
@@ -204,9 +207,12 @@ const testController = {
                     console.log("Postponed questions ids:")
                     console.log(questionUserIdPostponedRelation)
 
+                    console.log("Postponed answer question relation ids:")
+                    console.log(answerUserQuestionRelationId)
+
                     const checkPostponedQuestions = await Questions.find({_id: {$in: questionUserIdPostponedRelation}})
                     
-                    checkPostponedQuestions.forEach( async (question) => {
+                    checkPostponedQuestions.forEach( async (question, index) => {
                         console.log("Postponed questions statement:")
                         console.log(question.questionStatement)
 
@@ -217,6 +223,7 @@ const testController = {
 
                         // create and send an object as response
                         const questionResponse = {
+                            answerId: answerUserQuestionRelationId[index],
                             statement: question.questionStatement,
                             options: checkOptions
                         }
@@ -233,7 +240,26 @@ const testController = {
         }
     },
     updateAnswer: async (req, res) => {
-        
+        try {
+            const {answerId, optionId} = req.body
+            checkOptions = await Options.findById({_id: optionId})
+            if(!checkOptions) {
+                return res.status(400).json({message: 'Option provided does not exist'})
+            }
+
+            const updateAnswer = {
+                optionId: optionId,
+                isPostponed: false
+            }
+            checkUserAnswerRelation = await Answers.findOneAndUpdate({_id: answerId, userId: req.user.id}, updateAnswer)
+            if(!checkUserAnswerRelation) {
+                return res.status(400).json({message: 'Answer does not match with user records'})
+            }
+
+            res.json({message: 'Answer updated'})
+        } catch (err) {
+            return res.status(500).json({message: err.message}) 
+        }
     }
 }
 
