@@ -260,6 +260,52 @@ const testController = {
         } catch (err) {
             return res.status(500).json({message: err.message}) 
         }
+    },
+    addQuestion: async (req, res) => {
+        try {
+            const {questionnaireId, questionStatement, options} = req.body
+            const checkQuestionnaire = await Questionnaires.findById({ '_id': questionnaireId})
+
+            // check conditions 
+            if(!checkQuestionnaire) {
+                return res.status(400).json({message: 'Questionnaire does not exist'})
+            }
+
+            if(!questionStatement) {
+                return res.status(400).json({message: 'A question statement must be provided'})
+            }
+
+            if(options.length < 2) {
+                return res.status(400).json({message: 'At least two options must be provided'})
+            }
+
+            options.forEach( (obj) => {
+                if(!obj.optionStatement) {
+                    return res.status(400).json({message: 'All options must be provided'})
+                }
+            })
+
+            // create a new question and save it
+            const newQuestion = new Questions({
+                questionStatement,
+                questionnaireId
+            })
+            await newQuestion.save()
+
+            // create options for the new question and save it for each options
+            options.forEach( async (obj) => { 
+                const newOptions = new Options({
+                    optionStatement: obj.optionStatement,
+                    questionId: newQuestion._id,
+                    isCorrect: obj.isCorrect
+                })
+                await newOptions.save()
+            })
+        
+            res.json({message: 'Question and options added'})
+        } catch (err) {
+            return res.status(500).json({message: err.message}) 
+        }
     }
 }
 

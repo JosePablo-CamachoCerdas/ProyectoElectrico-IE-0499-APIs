@@ -13,4 +13,6 @@ router.post('/get_question', auth, testController.getQuestion)
 
 router.post('/update_answer', auth, testController.updateAnswer)
 
+router.post('/add_question', authAdmin, testController.addQuestion)
+
 module.exports = router
