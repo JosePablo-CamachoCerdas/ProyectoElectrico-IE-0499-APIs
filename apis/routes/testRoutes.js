@@ -5,9 +5,9 @@ const authAdmin = require('../middleware/authAdmin')
 
 router.post('/add_questionnaires', authAdmin, testController.addQuestionnaires)
 
-router.get('/get_questionnaires', auth ,testController.getQuestionnaires)
+router.get('/get_questionnaires', auth,testController.getQuestionnaires)
 
-router.get('/get_all_questionnaires', auth ,testController.getQuestionnairesAllInfo)
+router.get('/get_all_questionnaires', auth,testController.getQuestionnairesAllInfo)
 
 router.post('/add_questionnaire_to_user', authAdmin, testController.addQuestionnaireToUser)
 
@@ -25,7 +25,7 @@ router.post('/remove_questionnaire_from_user', authAdmin, testController.removeQ
 
 router.post('/remove_question', authAdmin, testController.removeQuestion)
 
-router.get('/get_all_questions', auth, testController.getAllQuestions)
+router.get('/get_all_questions', authAdmin, testController.getAllQuestions)
 
 router.get('/get_stats', auth, testController.getStats)
 

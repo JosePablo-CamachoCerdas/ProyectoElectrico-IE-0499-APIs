@@ -108,9 +108,8 @@ const testController = {
         }
     },
     getQuestion: async(req, res) => {
-        // FIXME: Create and edit logs by creating a DEBUG env variable to debug every API from console
+    // FIXME: Create and edit logs by creating a DEBUG env variable to debug every API from console
         try {
-            const {userId, questionnaireId} = req.body
             // check if questionnaire exists
             const checkQuestionnaire = await Questionnaires.findById(req.body.questionnaireId)
             if(!checkQuestionnaire) {
@@ -118,6 +117,7 @@ const testController = {
             }
 
             // check the questionnaires assigned to user
+            const userId = req.user.id
             const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.find({userId})
             if(checkRelationUserQuestionnaire.length == 0) {
                 res.status(400).json({message: 'User does not have questionnaires assigned'})
@@ -131,12 +131,11 @@ const testController = {
 
             // check if the user have access to the requested questionnaire
             if (!questionnairesIds.includes(req.body.questionnaireId)) {
-                return res.status(403).json({message: 'User does not have access to this questionnaire'})
+                return res.json({message: 'User does not have access to this questionnaire'})
             }
 
             // check the answers of user on the requested questionnaire
-
-            const checkUserQuestionnaireAnswers = await Answers.find({userId: userId, questionnaireId: questionnaireId})
+            const checkUserQuestionnaireAnswers = await Answers.find({userId: userId, questionnaireId: req.body.questionnaireId})
             const questionUserIdRelation = []
 
             // if user has answered at least one question, an array of questions ids is saved
@@ -145,7 +144,7 @@ const testController = {
                     questionUserIdRelation.push(obj.questionId)
                 })
             }
-            console.log(checkUserQuestionnaireAnswers.length)
+            console.log(checkUserQuestionnaireAnswers)
             console.log(questionUserIdRelation)
             console.log("-------------------------------------")
 
@@ -158,28 +157,24 @@ const testController = {
                     return res.status(400).json({message: 'There are no questions available for this questionnaire'})
                 }
                 console.log(checkQuestions)
-                console.log("CheckQuestions")
 
                 // check every question available for requested questionnaire
-                checkQuestions.forEach( (questionnaireQuestion) => {
-                    console.log("questionnaireQuestion: " + questionnaireQuestion)
+                checkQuestions.forEach( (obj) => {
+
                     // if user has not answered to the respective question(taken from array of questions
                     // ids and questions available) question and respectives answers will be displayed
-                    questionUserIdRelation.forEach( (userQuestionId) => {
-                        console.log("userQuestionId: " + userQuestionId)
-                        // user has not seen question
-                        if (userQuestionId != questionnaireQuestion._id) {
+                    questionUserIdRelation.forEach( async (questionId) => {
+                        if (questionId != obj._id) {
                             console.log("Question new to user")
-                            console.log(questionnaireQuestion._id)
+                            console.log(obj._id)
 
-                            // TODO: seems unnecesary since questions cant have less than two options
                             // check options for given available question
-                            // checkOptions = await Options.find({questionId: questionnaireQuestion._id}).select('_id, optionStatement')
-                            // if(checkOptions.length == 0) {
-                            //     return res.status(400).json({message: 'There are no options available for this question'})
-                            // }
+                            checkOptions = await Options.find({questionId: obj._id}).select('_id, optionStatement')
+                            if(checkOptions.length == 0) {
+                                return res.status(400).json({message: 'There are no options available for this question'})
+                            }
                             console.log("Question and Check options:")
-                            console.log(questionnaireQuestion)
+                            console.log(obj)
                             console.log(checkOptions)
 
                             // save this user-answer relation to answer model with an empty option and postoponed as true
@@ -187,7 +182,7 @@ const testController = {
                                 userId: req.user.id,
                                 optionId: "",
                                 questionnaireId: req.body.questionnaireId,
-                                questionId: questionnaireQuestion._id,
+                                questionId: obj._id,
                                 isPostponed: true
                             })
                             await newAnswer.save()
@@ -198,15 +193,12 @@ const testController = {
                             // create and send an object as response
                             const questionResponse = {
                                 answerId: newAnswer._id,
-                                statement: questionnaireQuestion,
+                                statement: obj,
                                 options: checkOptions
                             }
                             return res.json(questionResponse)
-                        } else {
-                          console.log("User has already seen question")
                         }
                     })
-                    console.log("Reached end of console log")
                 })
             } else if (checkUserQuestionnaireAnswers.length >= checkQuestionnaire.showedAmount) {
 
@@ -352,29 +344,47 @@ const testController = {
             if (!questionStatement) {
                 res.json({message: 'Question statement was not modified'})
             }else {
-                const updateQuestion = new Questions({
-                    questionStatement,
-                    questionnaireId
-                })
-                updateQuestionContent = await Answers.findOneAndUpdate({_id: questionId}, updateQuestion)
+                const updateQuestion = {
+                    questionStatement: questionStatement,
+                    questionnaireId: questionnaireId
+                }
+                updateQuestionContent = await Questions.findOneAndUpdate({_id: questionId}, updateQuestion)
             }
 
 
-            // create options for the new question and save it for each options
-            const checkNotUpdatedOptions = await Answers.find({questionId: questionId, questionnaireId: questionnaireId, isPostponed: false})
+            // update Options
+            const checkNotUpdatedOptions = await Options.find({questionId: questionId})
+            console.log(options)
+            //saves old ids
             const optionIds = []
-            checkUserNotPostponedAnswers.forEach( (obj) => {
-                optionIds.push(obj.optionId)
+            checkNotUpdatedOptions.forEach( (obj) => {
+                optionIds.push(obj._id)
             })
+            // match old id with new id and update content
+            for(let i=0; i < checkNotUpdatedOptions.length; i++){
+                for(let j=0; j < options.length; j++){
+                    if (checkNotUpdatedOptions[i]._id = options[j]._id) {
+                        await Options.findOneAndUpdate({_id: checkNotUpdatedOptions[i]._id}, options[j])
+                        //delete the option from old and new options array
+                        options.splice(j,1);
+                        optionIds.splice(i,1)
+                    }
+                }
+            }
 
+            //add the new options
             options.forEach( async (obj) => {
                 const newOptions = new Options({
                     optionStatement: obj.optionStatement,
-                    questionId: newQuestion._id,
+                    questionId: questionId,
                     isCorrect: obj.isCorrect
                 })
                 await newOptions.save()
             })
+            optionIds.forEach( async (obj) => {
+                await Options.deleteOne({_id: obj});
+            });
+
 
             res.json({message: 'Question and options updated'})
         } catch (err) {
@@ -496,7 +506,6 @@ const testController = {
             checkUserNotPostponedAnswers.forEach( (obj) => {
                 optionIds.push(obj.optionId)
             })
-
             // check questionnaires assigned for user
             const optionIsCorrectArray = await Options.find({ '_id': { $in: optionIds } }).select('isCorrect')
             optionIsCorrectArray.forEach( (optionIsCorrect) => {
