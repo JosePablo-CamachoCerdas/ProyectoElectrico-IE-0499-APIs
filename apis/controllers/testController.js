@@ -20,6 +20,11 @@ const testController = {
                 return res.status(400).json({message: 'Questionnaire already exists'})
             }
 
+            // check that totalAmount is higher than showedAmount
+            if(showedAmount>totalAmount){
+                return res.status(400).json({message: 'Total amount should be higher than showed amount'})
+            }
+
             // create a new questionnaire and save it
             const newQuestionnaire = new Questionnaires({
                 name,
@@ -39,22 +44,31 @@ const testController = {
 
             // check if user has questionnaries assigned
             const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.find({userId})
-            if(checkRelationUserQuestionnaire.length == 0) {
-                res.status(400).json({message: 'User does not have questionnaires assigned'})
-            }
-
-            // adding ids of questionnaires assigned to users to an array 
             const questionnairesIds = []
-            checkRelationUserQuestionnaire.forEach( (obj) => { 
-                questionnairesIds.push(obj.questionnaireId)  
+
+            // adding ids of questionnaires assigned to users to an array
+            checkRelationUserQuestionnaire.forEach( (obj) => {
+                questionnairesIds.push(obj.questionnaireId)
             })
+
 
             // check questionnaires assigned for user
             const checkUserQuestionnaires = await Questionnaires.find({ '_id': { $in: questionnairesIds } }).select('_id, name')
             const questionnairesList = {
                 questionnaires: checkUserQuestionnaires
             }
+            if (questionnairesList.length === 0){
+                res.status(400).json({message: 'User does not have questionnaires assigned'})
+            }
             res.json(questionnairesList)
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    getQuestionnairesAllInfo: async (req, res) => {
+        try {
+            const users = await Questionnaires.find()
+            res.json(users)
         } catch (err) {
             return res.status(500).json({message: err.message})
         }
@@ -77,12 +91,10 @@ const testController = {
             }
 
             // check if user already has the questionnaire assigned
-            const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.find({userId})
-            checkRelationUserQuestionnaire.forEach( (obj) => { 
-                if(obj.questionnaireId == questionnaireId) {
-                    return res.status(400).json({message: 'Questionnaire already assigned to user'})
-                }
-            })
+            const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.findOne({userId:userId, questionnaireId: questionnaireId})
+            if (checkRelationUserQuestionnaire){
+                return res.status(400).json({message: 'Questionnaire already assigned to user'})
+            }
 
             // create and save new user-questionnaire relation
             const newRelationUsersQuestionaires = new RelationUsersQuestionnaires({
@@ -96,7 +108,7 @@ const testController = {
         }
     },
     getQuestion: async(req, res) => {
-        // FIXME: Create and edit logs by creating a DEBUG env variable to debug every API from console
+    // FIXME: Create and edit logs by creating a DEBUG env variable to debug every API from console
         try {
             // check if questionnaire exists
             const checkQuestionnaire = await Questionnaires.findById(req.body.questionnaireId)
@@ -111,9 +123,9 @@ const testController = {
                 res.status(400).json({message: 'User does not have questionnaires assigned'})
             }
 
-            // adding ids of questionnaires assigned to users to an array 
+            // adding ids of questionnaires assigned to users to an array
             const questionnairesIds = []
-            checkRelationUserQuestionnaire.forEach( (obj) => { 
+            checkRelationUserQuestionnaire.forEach( (obj) => {
                 questionnairesIds.push(obj.questionnaireId)
             })
 
@@ -128,7 +140,7 @@ const testController = {
 
             // if user has answered at least one question, an array of questions ids is saved
             if(checkUserQuestionnaireAnswers.length > 0) {
-                checkUserQuestionnaireAnswers.forEach( (obj) => { 
+                checkUserQuestionnaireAnswers.forEach( (obj) => {
                     questionUserIdRelation.push(obj.questionId)
                 })
             }
@@ -145,11 +157,11 @@ const testController = {
                     return res.status(400).json({message: 'There are no questions available for this questionnaire'})
                 }
                 console.log(checkQuestions)
-                
+
                 // check every question available for requested questionnaire
                 checkQuestions.forEach( (obj) => {
 
-                    // if user has not answered to the respective question(taken from array of questions 
+                    // if user has not answered to the respective question(taken from array of questions
                     // ids and questions available) question and respectives answers will be displayed
                     questionUserIdRelation.forEach( async (questionId) => {
                         if (questionId != obj._id) {
@@ -192,18 +204,18 @@ const testController = {
 
                 // check for user's answers that are postponed
                 const checkUserPostponeAnswers = await Answers.find({userId: userId, questionnaireId: req.body.questionnaireId, isPostponed: true})
-                
+
                 // if user has at least one postponed question, an array of questions ids is saved
                 if(checkUserPostponeAnswers.length > 0) {
                     const questionUserIdPostponedRelation = []
                     const answerUserQuestionRelationId = []
-                    checkUserPostponeAnswers.forEach( (obj) => { 
+                    checkUserPostponeAnswers.forEach( (obj) => {
                         questionUserIdPostponedRelation.push(obj.questionId)
                         answerUserQuestionRelationId.push(obj._id)
                     })
                     console.log("Postponed answers")
                     console.log(checkUserPostponeAnswers)
-                    
+
                     console.log("Postponed questions ids:")
                     console.log(questionUserIdPostponedRelation)
 
@@ -211,7 +223,7 @@ const testController = {
                     console.log(answerUserQuestionRelationId)
 
                     const checkPostponedQuestions = await Questions.find({_id: {$in: questionUserIdPostponedRelation}})
-                    
+
                     checkPostponedQuestions.forEach( async (question, index) => {
                         console.log("Postponed questions statement:")
                         console.log(question.questionStatement)
@@ -258,7 +270,7 @@ const testController = {
 
             res.json({message: 'Answer updated'})
         } catch (err) {
-            return res.status(500).json({message: err.message}) 
+            return res.status(500).json({message: err.message})
         }
     },
     addQuestion: async (req, res) => {
@@ -266,7 +278,7 @@ const testController = {
             const {questionnaireId, questionStatement, options} = req.body
             const checkQuestionnaire = await Questionnaires.findById({ '_id': questionnaireId})
 
-            // check conditions 
+            // check conditions
             if(!checkQuestionnaire) {
                 return res.status(400).json({message: 'Questionnaire does not exist'})
             }
@@ -293,7 +305,7 @@ const testController = {
             await newQuestion.save()
 
             // create options for the new question and save it for each options
-            options.forEach( async (obj) => { 
+            options.forEach( async (obj) => {
                 const newOptions = new Options({
                     optionStatement: obj.optionStatement,
                     questionId: newQuestion._id,
@@ -301,12 +313,220 @@ const testController = {
                 })
                 await newOptions.save()
             })
-        
+
             res.json({message: 'Question and options added'})
         } catch (err) {
-            return res.status(500).json({message: err.message}) 
+            return res.status(500).json({message: err.message})
         }
-    }
+    },
+    updateQuestion: async (req, res) => {
+        try {
+            const {questionnaireId, questionId, questionStatement, options} = req.body
+            const checkQuestion = await Questions.findById({_id: questionId})
+
+            // check conditions
+            if(!checkQuestion) {
+                return res.status(400).json({message: 'Question does not exist'})
+            }
+
+            if(options.length < 2) {
+                return res.status(400).json({message: 'At least two options must be provided'})
+            }
+
+            options.forEach( (obj) => {
+                if(!obj.optionStatement) {
+                    return res.status(400).json({message: 'All option statements must be provided'})
+                }
+            })
+
+
+            // update the statement of the question
+            if (!questionStatement) {
+                res.json({message: 'Question statement was not modified'})
+            }else {
+                const updateQuestion = {
+                    questionStatement: questionStatement,
+                    questionnaireId: questionnaireId
+                }
+                updateQuestionContent = await Questions.findOneAndUpdate({_id: questionId}, updateQuestion)
+            }
+
+
+            // update Options
+            const checkNotUpdatedOptions = await Options.find({questionId: questionId})
+            console.log(options)
+            //saves old ids
+            const optionIds = []
+            checkNotUpdatedOptions.forEach( (obj) => {
+                optionIds.push(obj._id)
+            })
+            // match old id with new id and update content
+            for(let i=0; i < checkNotUpdatedOptions.length; i++){
+                for(let j=0; j < options.length; j++){
+                    if (checkNotUpdatedOptions[i]._id = options[j]._id) {
+                        await Options.findOneAndUpdate({_id: checkNotUpdatedOptions[i]._id}, options[j])
+                        //delete the option from old and new options array
+                        options.splice(j,1);
+                        optionIds.splice(i,1)
+                    }
+                }
+            }
+
+            //add the new options
+            options.forEach( async (obj) => {
+                const newOptions = new Options({
+                    optionStatement: obj.optionStatement,
+                    questionId: questionId,
+                    isCorrect: obj.isCorrect
+                })
+                await newOptions.save()
+            })
+            optionIds.forEach( async (obj) => {
+                await Options.deleteOne({_id: obj});
+            });
+
+
+            res.json({message: 'Question and options updated'})
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    removeQuestionnaires: async (req, res) => {
+        try {
+            // get variables from body request
+            const {questionnaireId} = req.body
+            if(!questionnaireId) {
+                return res.status(400).json({message: 'A questionnaire ID must be provided'})
+            }
+
+            // check if questionnaire already exists
+            const checkQuestionnaire = await Questionnaires.findOne({_id: questionnaireId})
+            if(!checkQuestionnaire) {
+                return res.status(400).json({message: 'Questionnaire does not exist'})
+            }
+            //remove a questionnaire and all o its associations
+            await Questionnaires.deleteOne({_id: questionnaireId});
+            res.json({message: 'Questionnaire removed'})
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    removeQuestionnaireFromUser: async (req, res) => {
+        try {
+            // get variables from body request
+            const {userId, questionnaireId} = req.body
+
+            // check if user exists
+            const checkUser = await Users.findOne({_id: userId})
+            if(!checkUser) {
+                return res.status(400).json({message: 'User does not exists'})
+            }
+
+            // check if questionnarie exists
+            const checkQuestionnaire = await Questionnaires.findOne({_id: questionnaireId})
+            if(!checkQuestionnaire) {
+                return res.status(400).json({message: 'Questionnaire does not exist'})
+            }
+
+            // check if user already has the questionnaire assigned
+            const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.findOne({userId:userId, questionnaireId: questionnaireId})
+            if (!checkRelationUserQuestionnaire){
+                return res.status(400).json({message: 'Questionnaire not related to user'})
+            }
+
+            //remove relation between user and questionnaire
+            await RelationUsersQuestionnaires.deleteOne({userId:userId, questionnaireId: questionnaireId});
+            res.status(200).json({message: 'Questionnaire removed from user'})
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    removeQuestion: async (req, res) => {
+        try {
+            // get variables from body request
+            const {questionId} = req.body
+            if(!questionId) {
+                return res.status(400).json({message: 'A question ID must be provided'})
+            }
+
+            // check if question already exists
+            const checkQuestion = await Questions.findOne({_id: questionId})
+            if(!checkQuestion) {
+                return res.status(400).json({message: 'Question does not exist'})
+            }
+            //remove a question and all o its associations
+            await Questions.deleteOne({_id: questionId});
+            res.json({message: 'Question removed'})
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    getAllQuestions: async (req, res) => {
+        try {
+            const question = await Questions.find()
+            res.json(question)
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
+    getStats: async (req, res) => {
+        var incorrectAnswers=0, correctAnswers=0
+        try {
+            // get variables from body request
+            const {userId, questionnaireId} = req.body
+
+            // check if user exists
+            const checkUser = await Users.findOne({_id: userId})
+            if(!checkUser) {
+                return res.status(400).json({message: 'User does not exists'})
+            }
+
+            // check if questionnarie exists
+            const checkQuestionnaire = await Questionnaires.findOne({_id: questionnaireId})
+            if(!checkQuestionnaire) {
+                return res.status(400).json({message: 'Questionnaire does not exist'})
+            }
+
+            // check if user has the questionnaire assigned
+            const checkRelationUserQuestionnaire = await RelationUsersQuestionnaires.findOne({userId:userId, questionnaireId: questionnaireId})
+            if (!checkRelationUserQuestionnaire){
+                return res.status(400).json({message: 'Questionnaire not related to user'})
+            }
+
+            //totalAnswers
+            const checkUserAnswers = await Answers.find({userId: userId, questionnaireId: questionnaireId})
+            totalAnswers = checkUserAnswers.length
+
+            // total amount o postponed answers
+            const checkUserPostponedAnswers = await Answers.find({userId: userId, questionnaireId: questionnaireId, isPostponed: true})
+            postponedAnswers = checkUserPostponedAnswers.length
+
+            const checkUserNotPostponedAnswers = await Answers.find({userId: userId, questionnaireId: questionnaireId, isPostponed: false})
+            const optionIds = []
+            checkUserNotPostponedAnswers.forEach( (obj) => {
+                optionIds.push(obj.optionId)
+            })
+            // check questionnaires assigned for user
+            const optionIsCorrectArray = await Options.find({ '_id': { $in: optionIds } }).select('isCorrect')
+            optionIsCorrectArray.forEach( (optionIsCorrect) => {
+                if (optionIsCorrect['isCorrect']==true){
+                    correctAnswers++
+                }else {
+                    incorrectAnswers++
+                }
+            })
+            // creates a json object to return
+            var data = {
+              totalQuestionsAssigned: totalAnswers,
+              postponedAnswers: postponedAnswers,
+              correctAnswers: correctAnswers,
+              incorrectAnswers: incorrectAnswers
+            };
+            res.status(200).json(data)
+        } catch (err) {
+            return res.status(500).json({message: err.message})
+        }
+    },
 }
 
 module.exports = testController
